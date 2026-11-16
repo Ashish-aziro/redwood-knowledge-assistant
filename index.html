@@ -68,7 +68,16 @@ select.az-input { appearance: auto; }
 details { border-top: 1px solid var(--az-line); padding-top: 8px; font-size: 13px; color: var(--az-muted); }
 summary { cursor: pointer; font-weight: 600; color: var(--az-blue); }
 .note { font-size: 14px; color: var(--az-muted); background: #f7f9fc; border-left: 3px solid var(--az-orange); padding: 8px 12px; border-radius: 4px; }
-.thinking { color: var(--az-muted); }
+.thinking { display: flex; align-items: center; gap: 12px; color: var(--az-muted); }
+.thinking-text { display: flex; flex-direction: column; gap: 2px; }
+.thinking-step { color: var(--az-navy); font-weight: 500; }
+.thinking-time { font-size: 13px; font-variant-numeric: tabular-nums; }
+.dots { display: inline-flex; gap: 5px; flex: none; }
+.dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--az-orange); animation: az-bounce 1.2s infinite ease-in-out; }
+.dots span:nth-child(2) { animation-delay: .15s; }
+.dots span:nth-child(3) { animation-delay: .3s; }
+@keyframes az-bounce { 0%, 80%, 100% { transform: scale(.6); opacity: .4; } 40% { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .dots span { animation: none; opacity: .8; } }
 form { display: flex; gap: 10px; align-items: flex-end; padding: 14px 20px; border-top: 1px solid var(--az-line); background: #fff; }
 form textarea { flex: 1; min-width: 0; resize: none; max-height: 140px; }
 :focus-visible { outline: 2px solid var(--az-blue); outline-offset: 2px; }
@@ -148,12 +157,13 @@ const SOURCES = [
   { name: "Gmail", detail: "37 messages with customers and vendors", groups: ["sales", "leadership"] },
   { name: "SAP S/4HANA", detail: "Orders, invoices, suppliers, accounts", groups: ["finance", "leadership"] }
 ];
+// Each role's prompts were asked as that role on the live flow (2026-11-16) and all came back with a cited answer.
 const USERS = [
-  { id: "eng_user", label: "Engineering", groups: ["all", "eng", "product"], prompts: ["Why did latency regress after the tokenizer update?"] },
-  { id: "support_user", label: "Support", groups: ["all", "support"], prompts: ["What is the procurement approval matrix?", "List open sales orders for DataScout"] },
-  { id: "sales_user", label: "Sales", groups: ["all", "sales"], prompts: ["What came out of the Q3 QBR with Verity Labs?"] },
-  { id: "finance_user", label: "Finance", groups: ["all", "finance"], prompts: ["List open sales orders for DataScout", "What is the procurement approval matrix?"] },
-  { id: "exec_user", label: "Executive", groups: ["all", "leadership", "finance", "legal", "sales", "product"], prompts: ["What came out of the Q3 QBR with Verity Labs?", "List open sales orders for Greenline Health"] }
+  { id: "eng_user", label: "Engineering", groups: ["all", "eng", "product"], prompts: ["Why did latency regress after the tokenizer update?", "What are the milestones for the Helion Labs launch?", "What is the hotel limit in the travel policy?"] },
+  { id: "support_user", label: "Support", groups: ["all", "support"], prompts: ["What is the status of the DataScout duplicate usage issue?", "What happened with Helion Labs queue depth in europe-west3?", "What does a new hire do in their first week?"] },
+  { id: "sales_user", label: "Sales", groups: ["all", "sales"], prompts: ["What came out of the Q3 QBR with Verity Labs?", "How did we answer Greenline Health's pilot invoice question?", "Which customers are not green in the Q4 health scorecard?"] },
+  { id: "finance_user", label: "Finance", groups: ["all", "finance"], prompts: ["What is the procurement approval matrix?", "Which purchase orders do we have with Apex GPU Leasing?", "Who is our SOC 2 auditor and what is the audit window?"] },
+  { id: "exec_user", label: "Executive", groups: ["all", "leadership", "finance", "legal", "sales", "product"], prompts: ["What are the Q4 2026 OKRs?", "List open sales orders for Greenline Health", "Which customers are not green in the Q4 health scorecard?"] }
 ];
 const WELCOME = "Ask me about Redwood's tickets, wiki, documents, email or SAP records.";
 
@@ -215,12 +225,44 @@ function explainFailure(status) {
   return `The request failed (error ${status}). Please try again.`;
 }
 
+// The flow returns one reply at the end, so these steps follow its usual timing rather than live events.
+const THINKING_STEP_MS = 6000;
+const SECOND_MS = 1000;
+function thinkingSteps() {
+  const names = SOURCES.filter((s) => s.groups.some((g) => state.user.groups.includes(g))).map((s) => s.name);
+  return [
+    "Understanding your question…",
+    `Searching ${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}…`,
+    "Reading the most relevant records…",
+    "Checking every quote against its source…",
+    "Writing the answer with citations…"
+  ];
+}
+
+// An animated progress message. It stops its own timer once it is removed from the page.
+function thinkingMessage() {
+  const steps = thinkingSteps();
+  const started = Date.now();
+  const step = element("span", { className: "thinking-step", textContent: steps[0] });
+  const time = element("span", { className: "thinking-time", textContent: "0 s" });
+  const dots = element("span", { className: "dots" }, [element("span"), element("span"), element("span")]);
+  dots.setAttribute("aria-hidden", "true");
+  const node = element("div", { className: "msg bot thinking", role: "status" }, [dots, element("span", { className: "thinking-text" }, [step, time])]);
+  const timer = setInterval(() => {
+    if (!node.isConnected) { clearInterval(timer); return; }
+    const elapsed = Date.now() - started;
+    step.textContent = steps[Math.min(Math.floor(elapsed / THINKING_STEP_MS), steps.length - 1)];
+    time.textContent = `${Math.floor(elapsed / SECOND_MS)} s`;
+  }, SECOND_MS);
+  return node;
+}
+
 async function ask(text) {
   const question = text.trim();
   if (!question || state.busy) return;
   setBusy(true);
   addMessage(element("div", { className: "msg user", textContent: question }));
-  const waiting = addMessage(element("div", { className: "msg bot thinking", textContent: "Searching Redwood's systems..." }));
+  const waiting = addMessage(thinkingMessage());
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
