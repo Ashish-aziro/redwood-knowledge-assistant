@@ -107,7 +107,7 @@ form textarea { flex: 1; min-width: 0; resize: none; max-height: 140px; }
     <section class="az-hero">
       <span class="az-eyebrow">Enterprise knowledge</span>
       <h1>Ask <span class="az-accent">one</span> question</h1>
-      <p>It searches seven live company systems and answers with citations, or says it couldn't find the answer.</p>
+      <p>It searches nine live company systems and answers with citations, or says it couldn't find the answer.</p>
     </section>
     <div class="az-card">
       <label for="role">Ask as</label>
@@ -117,7 +117,7 @@ form textarea { flex: 1; min-width: 0; resize: none; max-height: 140px; }
     <div class="az-card">
       <h3 class="section-title">Connected data</h3>
       <div class="sources" id="sources"></div>
-      <p class="small muted">Counts checked on 2 November 2026.</p>
+      <p class="small muted">Counts checked on 18 November 2026.</p>
     </div>
     <div class="az-card">
       <h3 class="section-title">Try asking</h3>
@@ -155,17 +155,20 @@ const SOURCES = [
   { name: "Jira", detail: "26 issues: customer support and internal IT", groups: ["eng", "support", "leadership"] },
   { name: "Linear", detail: "41 issues, 13 projects: engineering and product", groups: ["eng", "product", "leadership"] },
   { name: "Gmail", detail: "37 messages with customers and vendors", groups: ["sales", "leadership"] },
-  { name: "SAP S/4HANA", detail: "Orders, invoices, suppliers, accounts", groups: ["finance", "leadership"] }
+  { name: "SAP S/4HANA", detail: "Meridian Industrial ERP: 1,435 sales orders, 1,359 invoices", groups: ["finance", "leadership"] },
+  { name: "Oracle Fusion", detail: "Meridian Industrial ERP: suppliers, payables, expenses", groups: ["finance", "leadership"] },
+  { name: "Dynamics 365", detail: "Meridian Industrial ERP: 4 legal entities, sales, vendors", groups: ["finance", "leadership"] }
 ];
-// Each role's prompts were asked as that role on the live flow (2026-11-16) and all came back with a cited answer.
+// Each role's prompts were asked as that role on the live flow (2026-11-16) and came back with a cited answer. The ERP prompts
+// (SAP, Oracle, Dynamics: Meridian Industrial since 2026-11-18) were checked against the live ERP data; recheck them once the flow is redeployed.
 const USERS = [
   { id: "eng_user", label: "Engineering", groups: ["all", "eng", "product"], prompts: ["Why did latency regress after the tokenizer update?", "What are the milestones for the Helion Labs launch?", "What is the hotel limit in the travel policy?"] },
   { id: "support_user", label: "Support", groups: ["all", "support"], prompts: ["What is the status of the DataScout duplicate usage issue?", "What happened with Helion Labs queue depth in europe-west3?", "What does a new hire do in their first week?"] },
   { id: "sales_user", label: "Sales", groups: ["all", "sales"], prompts: ["What came out of the Q3 QBR with Verity Labs?", "How did we answer Greenline Health's pilot invoice question?", "Which customers are not green in the Q4 health scorecard?"] },
-  { id: "finance_user", label: "Finance", groups: ["all", "finance"], prompts: ["What is the procurement approval matrix?", "Which purchase orders do we have with Apex GPU Leasing?", "Who is our SOC 2 auditor and what is the audit window?"] },
-  { id: "exec_user", label: "Executive", groups: ["all", "leadership", "finance", "legal", "sales", "product"], prompts: ["What are the Q4 2026 OKRs?", "List open sales orders for Greenline Health", "Which customers are not green in the Q4 health scorecard?"] }
+  { id: "finance_user", label: "Finance", groups: ["all", "finance"], prompts: ["What is the procurement approval matrix?", "What sales orders does Acme Corporation have in SAP?", "Which supplier invoices from Edwards-Jenkins are in Oracle?"] },
+  { id: "exec_user", label: "Executive", groups: ["all", "leadership", "finance", "legal", "sales", "product"], prompts: ["What are the Q4 2026 OKRs?", "Which legal entities does Meridian have in Dynamics?", "Which customers are not green in the Q4 health scorecard?"] }
 ];
-const WELCOME = "Ask me about Redwood's tickets, wiki, documents, email or SAP records.";
+const WELCOME = "Ask me about Redwood's tickets, wiki, documents and email, or Meridian Industrial's ERP records in SAP, Oracle Fusion and Dynamics 365.";
 
 const byId = (id) => document.getElementById(id);
 const element = (tag, props = {}, children = []) => {
